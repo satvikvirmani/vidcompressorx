@@ -1,4 +1,4 @@
-# videocompressorx
+# vidcompressorx
 
 A Python library for video compression using metric-based keyframe selection.
 
@@ -10,4 +10,4 @@ A Python library for video compression using metric-based keyframe selection.
 
 ## Installation
 ```bash
-pip install videocompressorx
+pip install vidcompressorx
