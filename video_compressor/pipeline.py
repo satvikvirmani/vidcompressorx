@@ -7,14 +7,13 @@ import subprocess
 import numpy as np
 import lpips
 
-from tqdm import tqdm
 from typing import List, Tuple, Optional
 from matplotlib import pyplot as plt
 from matplotlib import cm, colors
 from scipy.stats import norm
 
-from metrics import Metrics
-
+from video_compressor.metrics import Metrics
+from video_compressor.utils.progress import progress
 
 class KeyframeSelector:
     def __init__(self, video_path: str, verbose: bool = True) -> None:
@@ -96,7 +95,7 @@ class KeyframeSelector:
         if not ret:
             raise RuntimeError("Failed to read first frame")
 
-        for i in tqdm(range(self.frame_pairs), desc="Computing metrics", ncols=100):
+        for i in progress(range(self.frame_pairs), desc="Computing metrics", ncols=100):
             ret, curr_frame = cap.read()
             if not ret:
                 break
@@ -238,7 +237,7 @@ class KeyframeSelector:
         adapt_factors = np.linspace(-2.0, 5.0, num_factors)
         retained_ratios, abs_vals, delta_vals = [], [], []
 
-        for f in tqdm(adapt_factors, desc="Analyzing thresholds"):
+        for f in progress(adapt_factors, desc="Analyzing thresholds"):
             ratio, abs_t, delta_t = self.select_keyframes(
                 adapt_factor=f, set_data=False
             )
