@@ -1,4 +1,4 @@
-from typing import Iterable, Optional
+from typing import Any
 
 def _in_notebook() -> bool:
     try:
@@ -10,6 +10,9 @@ def _in_notebook() -> bool:
 
 
 def get_tqdm():
+    """
+    Returns tqdm or tqdm.notebook.tqdm depending on environment.
+    """
     if _in_notebook():
         from tqdm.notebook import tqdm
     else:
@@ -17,10 +20,9 @@ def get_tqdm():
     return tqdm
 
 
-def progress(
-    iterable: Iterable,
-    desc: Optional[str] = None,
-    total: Optional[int] = None,
-):
+def progress(*args: Any, **kwargs: Any):
+    """
+    Drop-in replacement for tqdm that works in scripts and notebooks.
+    """
     tqdm = get_tqdm()
-    return tqdm(iterable, desc=desc, total=total)
+    return tqdm(*args, **kwargs)
