@@ -341,11 +341,7 @@ class KeyframeSelector:
         orig = os.path.getsize(self.video_path) / (1024 ** 2)
         new = os.path.getsize(self.output_video) / (1024 ** 2)
 
-        print("\n=== SIZE COMPARISON ===")
-        print(f"Original: {orig:.2f} MB")
-        print(f"Keyframe: {new:.2f} MB")
-        print(f"Reduction: {orig - new:.2f} MB")
-        print(f"Ratio: {orig / new:.2f}x")
+        return orig, new
 
     def create_compressed_video(self) -> None:
         if not self.retained_indices_computed:
@@ -362,4 +358,3 @@ class KeyframeSelector:
 
         if self.verbose:
             print(f"Keyframe video created at {self.output_video}")
-            self.get_sizes()
