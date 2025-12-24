@@ -7,7 +7,7 @@ import subprocess
 import numpy as np
 import lpips
 
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Callable
 from matplotlib import pyplot as plt
 from matplotlib import cm, colors
 from scipy.stats import norm
@@ -28,6 +28,7 @@ class KeyframeSelector:
         self.frame_pairs: int = 0
         self.metrics: Optional[np.ndarray] = None
         self.retained_indices: Optional[List[int]] = None
+        self.reductions: List[dict] = []
 
         # Flags (kept intentionally)
         self.metrics_computed: bool = False
@@ -78,7 +79,7 @@ class KeyframeSelector:
     # Metrics
     # ------------------------------------------------------------------ #
 
-    def compute_metrics(self) -> np.ndarray:
+    def compute_metrics(self, callback: Optional[Callable[[float, str], None]] = None) -> np.ndarray:
         cap = cv2.VideoCapture(self.video_path)
         if not cap.isOpened():
             raise ValueError(f"Could not open video: {self.video_path}")
@@ -95,7 +96,11 @@ class KeyframeSelector:
         if not ret:
             raise RuntimeError("Failed to read first frame")
 
-        for i in progress(range(self.frame_pairs), desc="Computing metrics", ncols=100):
+        iterable = range(self.frame_pairs)
+        if callback is None:
+            iterable = progress(iterable, desc="Computing metrics", ncols=100)
+
+        for i in iterable:
             ret, curr_frame = cap.read()
             if not ret:
                 break
@@ -109,6 +114,9 @@ class KeyframeSelector:
             ]
 
             prev_frame = curr_frame
+            
+            if callback:
+                callback((i + 1) / self.frame_pairs, f"Computing metrics: {i + 1}/{self.frame_pairs}")
 
         cap.release()
         self.metrics_computed = True
@@ -233,6 +241,29 @@ class KeyframeSelector:
         plt.savefig(out, dpi=300)
         plt.close()
 
+    def set_reductions(self, n: int = 20) -> List[dict]:
+        if not self.metrics_computed:
+            raise RuntimeError("Metrics not computed")
+            
+        adapt_factors = np.linspace(-2.0, 5.0, n)
+        self.reductions = []
+        
+        for f in adapt_factors:
+            ratio, abs_t, delta_t = self.select_keyframes(
+                adapt_factor=f, set_data=False
+            )
+            # Store reduction info (higher ratio = less reduction)
+            # reduction % = (1 - ratio) * 100
+            self.reductions.append({
+                'reduction_percent': (1 - ratio) * 100,
+                'ratio': ratio,
+                'abs_thres': abs_t,
+                'delta_thres': delta_t,
+                'adapt_factor': f
+            })
+            
+        return self.reductions
+
     def analyze_thresholds(self, num_factors: int = 20) -> None:
         adapt_factors = np.linspace(-2.0, 5.0, num_factors)
         retained_ratios, abs_vals, delta_vals = [], [], []
@@ -297,7 +328,7 @@ class KeyframeSelector:
     # Video Creation
     # ------------------------------------------------------------------ #
 
-    def _extract_frames(self) -> float:
+    def _extract_frames(self, callback: Optional[Callable[[float, str], None]] = None) -> float:
         if os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir)
         os.makedirs(self.temp_dir, exist_ok=True)
@@ -316,6 +347,10 @@ class KeyframeSelector:
                     os.path.join(self.temp_dir, f"frame_{saved:04d}.jpg"), frame
                 )
                 saved += 1
+            
+            if callback and i % 5 == 0:
+                total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                callback((i + 1) / total_frames, f"Extracting frames: {i + 1}/{total_frames}")
 
         cap.release()
         return fps
@@ -343,11 +378,11 @@ class KeyframeSelector:
 
         return orig, new
 
-    def create_compressed_video(self) -> None:
+    def create_compressed_video(self, callback: Optional[Callable[[float, str], None]] = None) -> None:
         if not self.retained_indices_computed:
             raise RuntimeError("Keyframes not selected")
 
-        fps = self._extract_frames()
+        fps = self._extract_frames(callback=callback)
         name = os.path.splitext(os.path.basename(self.video_path))[0]
         self.output_video = os.path.join(self.output_dir, f"{name}_keyframes.mp4")
 
